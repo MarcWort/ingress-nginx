@@ -107,6 +107,12 @@ export OPENTELEMETRY_PROTO_VERSION=v1.5.0
 # Check for recent changes: https://github.com/nginx/njs/compare/0.9.0...master
 export NJS_VERSION=0.9.0
 
+# Check for recent changes: https://github.com/open-telemetry/opentelemetry-cpp-contrib/compare/8933841f0a7f8737f61404cf0a64acf6b079c8a5...main
+export OPENTELEMETRY_CONTRIB_COMMIT=8933841f0a7f8737f61404cf0a64acf6b079c8a5
+
+# Check for recent changes: https://github.com/ssdeep-project/ssdeep/compare/5ae3e5363281eacfac6292aebe77ebb0bde18c6e...master
+export SSDEEP_COMMIT=5ae3e5363281eacfac6292aebe77ebb0bde18c6e
+
 export BUILD_PATH=/tmp/build
 
 ARCH=$(uname -m)
@@ -273,6 +279,18 @@ get_src d74f86ada2329016068bc5a243268f1f555edd620b6a7d6ce89295e7d6cf18da \
 get_src abc123 \
         "https://github.com/nginx/njs/archive/${NJS_VERSION}.tar.gz" "njs"
 
+get_src abc123 \
+        "https://github.com/coreruleset/coreruleset/archive/refs/tags/$OWASP_MODSECURITY_CRS_VERSION.tar.gz" "coreruleset"
+
+get_src abc123 \
+        "https://github.com/owasp-modsecurity/ModSecurity/releases/download/$MODSECURITY_LIB_VERSION/modsecurity-$MODSECURITY_LIB_VERSION.tar.gz" "ModSecurity"
+
+get_src abc123 \
+        "https://github.com/open-telemetry/opentelemetry-cpp-contrib/archive/$OPENTELEMETRY_CONTRIB_COMMIT.tar.gz" "opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}"
+
+get_src abc123 \
+        "https://github.com/ssdeep-project/ssdeep/archive/$SSDEEP_COMMIT.tar.gz" "ssdeep"
+
 # improve compilation times
 CORES=$(($(grep -c ^processor /proc/cpuinfo) - 1))
 
@@ -324,9 +342,7 @@ git reset --hard a71f9312c2deb28875acc7bacfdd5695a111aa53
 git submodule init
 git submodule update
 
-cd "$BUILD_PATH"
-git clone --depth=1 https://github.com/ssdeep-project/ssdeep
-cd ssdeep/
+cd "$BUILD_PATH/ssdeep/"
 
 ./bootstrap
 ./configure
@@ -335,12 +351,7 @@ make
 make install
 
 # build modsecurity library
-cd "$BUILD_PATH"
-git clone -n https://github.com/owasp-modsecurity/ModSecurity
-cd ModSecurity/
-git checkout $MODSECURITY_LIB_VERSION
-git submodule init
-git submodule update
+cd "$BUILD_PATH/ModSecurity/"
 
 sh build.sh
 
@@ -376,12 +387,10 @@ sed -i 's|SecAuditLogType Serial|SecAuditLogType Concurrent|g' /etc/nginx/modsec
 # Concurrent logging implies the log is stored in several files
 echo "SecAuditLogStorageDir /var/log/audit/" >> /etc/nginx/modsecurity/modsecurity.conf
 
-# Download owasp modsecurity crs
-cd /etc/nginx/
+# move owasp modsecurity crs to the right place
+mv "$BUILD_PATH/coreruleset" /etc/nginx/owasp-modsecurity-crs
 
-git clone -b $OWASP_MODSECURITY_CRS_VERSION https://github.com/coreruleset/coreruleset
-mv coreruleset owasp-modsecurity-crs
-cd owasp-modsecurity-crs
+cd /etc/nginx/owasp-modsecurity-crs
 
 mv crs-setup.conf.example crs-setup.conf
 mv rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf.example rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf
@@ -518,14 +527,7 @@ make
 make modules
 make install
 
-# Check for recent changes: https://github.com/open-telemetry/opentelemetry-cpp-contrib/compare/8933841f0a7f8737f61404cf0a64acf6b079c8a5...main
-export OPENTELEMETRY_CONTRIB_COMMIT=8933841f0a7f8737f61404cf0a64acf6b079c8a5
-cd "$BUILD_PATH"
-
-git clone https://github.com/open-telemetry/opentelemetry-cpp-contrib.git opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}
-
 cd ${BUILD_PATH}/opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}
-git reset --hard ${OPENTELEMETRY_CONTRIB_COMMIT}
 
 export OTEL_TEMP_INSTALL=/tmp/otel
 mkdir -p ${OTEL_TEMP_INSTALL}
